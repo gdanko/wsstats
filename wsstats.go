@@ -132,7 +132,7 @@ func (w *Wezterm) CreateLockfile() (err error) {
 }
 
 func (w *Wezterm) ShowVersion() {
-	fmt.Fprintf(os.Stdout, "netspeed version %s\n", internal.Version(false, true))
+	fmt.Fprintf(os.Stdout, "wsstats version %s\n", internal.Version(false, true))
 }
 
 func (w *Wezterm) ProcessOutput(WeztermStatsData map[string]interface{}) {
