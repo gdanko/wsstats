@@ -1,7 +1,7 @@
 GOPATH := $(shell go env GOPATH)
 GOOS := $(shell go env GOOS)
 GOARCH := $(shell go env GOARCH)
-NETSPEED_VERSION := ${NETSPEED_VERSION}
+WSSTATS_VERSION := ${WSSTATS_VERSION}
 
 .PHONY: all build install
 
@@ -12,26 +12,26 @@ mod-tidy:
 	go mod tidy
 
 .PHONY: build OS ARCH
-build: guard-NETSPEED_VERSION mod-tidy clean
+build: guard-WSSTATS_VERSION mod-tidy clean
 	@echo "================================================="
-	@echo "Building netspeed"
+	@echo "Building wsstats"
 	@echo "=================================================\n"
 
 	@if [ ! -d "${GOOS}" ]; then \
 		mkdir "${GOOS}"; \
 	fi
-	GOOS=${GOOS} GOARCH=${GOARCH} go build -o "${GOOS}/netspeed"
+	GOOS=${GOOS} GOARCH=${GOARCH} go build -o "${GOOS}/wsstats"
 	sleep 2
-	tar -C "${GOOS}" -czvf "netspeed_${NETSPEED_VERSION}_${GOOS}_${GOARCH}.tgz" netspeed; \
+	tar -C "${GOOS}" -czvf "wsstats_${WSSTATS_VERSION}_${GOOS}_${GOARCH}.tgz" wsstats; \
 
 .PHONY: clean
 clean:
 	@echo "================================================="
-	@echo "Cleaning netspeed"
+	@echo "Cleaning wsstats"
 	@echo "=================================================\n"
 	@for OS in darwin linux; do \
-		if [ -f $${OS}/netspeed ]; then \
-			rm -f $${OS}/netspeed; \
+		if [ -f $${OS}/wsstats ]; then \
+			rm -f $${OS}/wsstats; \
 		fi; \
 	done
 
@@ -45,7 +45,7 @@ clean-all: clean
 .PHONY: install
 install:
 	@echo "================================================="
-	@echo "Installing netspeed in ${GOPATH}/bin"
+	@echo "Installing wsstats in ${GOPATH}/bin"
 	@echo "=================================================\n"
 
 	go install -race
