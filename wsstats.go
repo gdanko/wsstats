@@ -40,17 +40,16 @@ type Wezterm struct {
 	LogfileHandle  *os.File
 	RunTimeCurrent uint64
 	IostatDataOld  test_runner.IOStatData
-	IostatDataNew  test_runner.IOStatData
 }
 
 type Options struct {
-	All          bool `short:"a" long:"all" description:"Report all system info."`
-	CPU          bool `short:"c" long:"cpu" description:"Report system CPU usage."`
-	Disk         bool `short:"d" long:"disk" description:"Report system disk usage."`
-	Load         bool `short:"l" long:"load" description:"Report system load averages."`
-	Memory       bool `short:"m" long:"memory" description:"Report system memory usage."`
-	Net          bool `short:"n" long:"network" description:"Report network throughput information."`
-	Swap         bool `short:"s" long:"swap" description:"Report swap memory usage."`
+	All          bool `short:"a" long:"all" description:"Report all available system info (default)"`
+	CPU          bool `short:"c" long:"cpu" description:"Report system CPU usage"`
+	Disk         bool `short:"d" long:"disk" description:"Report system disk usage"`
+	Load         bool `short:"l" long:"load" description:"Report system load averages"`
+	Memory       bool `short:"m" long:"memory" description:"Report system memory usage"`
+	Net          bool `short:"n" long:"network" description:"Report network throughput information"`
+	Swap         bool `short:"s" long:"swap" description:"Report swap memory usage"`
 	PrintVersion bool `short:"V" long:"version" description:"Print program version"`
 }
 
