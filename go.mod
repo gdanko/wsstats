@@ -1,4 +1,4 @@
-module github.com/gdanko/wezterm-system-stats
+module github.com/gdanko/wsstats
 
 go 1.22.2
 

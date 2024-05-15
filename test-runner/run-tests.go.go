@@ -3,8 +3,8 @@ package test_runner
 import (
 	"fmt"
 
-	"github.com/gdanko/wezterm-system-stats/iostat"
-	"github.com/gdanko/wezterm-system-stats/stats"
+	"github.com/gdanko/wsstats/iostat"
+	"github.com/gdanko/wsstats/stats"
 	"github.com/shirou/gopsutil/v3/load"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/sirupsen/logrus"

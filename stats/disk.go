@@ -3,7 +3,7 @@ package stats
 import (
 	"strings"
 
-	"github.com/gdanko/wezterm-system-stats/util"
+	"github.com/gdanko/wsstats/util"
 	"github.com/shirou/gopsutil/disk"
 )
 
