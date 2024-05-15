@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"os/user"
 	"time"
@@ -58,4 +59,8 @@ func DeleteFile(filename string) (err error) {
 		}
 	}
 	return nil
+}
+
+func RoundTo(n float64, decimals uint32) float64 {
+	return math.Round(n*math.Pow(10, float64(decimals))) / math.Pow(10, float64(decimals))
 }
