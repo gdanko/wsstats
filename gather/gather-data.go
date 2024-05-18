@@ -36,6 +36,13 @@ func GetDiskUsage(c chan func() ([]stats.DiskUsageData, error)) {
 	})
 }
 
+func GetHostInformation(c chan func() (stats.HostInformation, error)) {
+	c <- (func() (stats.HostInformation, error) {
+		hostInformation, err := stats.GetHostInformation()
+		return hostInformation, err
+	})
+}
+
 func GetLoadAverages(c chan func() (*load.AvgStat, error)) {
 	c <- (func() (*load.AvgStat, error) {
 		loadAverages, err := stats.GetLoadAverages()

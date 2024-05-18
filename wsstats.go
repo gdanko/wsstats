@@ -11,10 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	test_runner "github.com/gdanko/wsstats/gather"
 	"github.com/gdanko/wsstats/internal"
 	"github.com/gdanko/wsstats/iostat"
 	"github.com/gdanko/wsstats/stats"
-	test_runner "github.com/gdanko/wsstats/test-runner"
 	"github.com/gdanko/wsstats/util"
 	flags "github.com/jessevdk/go-flags"
 	"github.com/shirou/gopsutil/v3/load"
@@ -28,6 +28,7 @@ type Wezterm struct {
 	All            bool
 	CPU            bool
 	Disk           bool
+	Host           bool
 	Load           bool
 	Memory         bool
 	Net            bool
@@ -46,6 +47,7 @@ type Options struct {
 	All          bool `short:"a" long:"all" description:"Report all available system info (default)"`
 	CPU          bool `short:"c" long:"cpu" description:"Report system CPU usage"`
 	Disk         bool `short:"d" long:"disk" description:"Report system disk usage"`
+	Host         bool `long:"host" description:"Report system host information"`
 	Load         bool `short:"l" long:"load" description:"Report system load averages"`
 	Memory       bool `short:"m" long:"memory" description:"Report system memory usage"`
 	Net          bool `short:"n" long:"network" description:"Report network throughput information"`
@@ -75,6 +77,7 @@ func (w *Wezterm) init(args []string) error {
 	w.All = opts.All
 	w.CPU = opts.CPU
 	w.Disk = opts.Disk
+	w.Host = opts.Host
 	w.Load = opts.Load
 	w.Memory = opts.Memory
 	w.Net = opts.Net
@@ -87,7 +90,7 @@ func (w *Wezterm) init(args []string) error {
 	w.StartTime = util.GetTimestamp()
 
 	if len(args) == 1 || w.All {
-		w.CPU, w.Disk, w.Load, w.Memory, w.Net, w.Swap = true, true, true, true, true, true
+		w.CPU, w.Disk, w.Host, w.Load, w.Memory, w.Net, w.Swap = true, true, true, true, true, true, true
 	}
 
 	w.LogfileHandle, err = os.OpenFile(w.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
@@ -176,6 +179,15 @@ func (w *Wezterm) ParallelTester() (output map[string]interface{}) {
 		diskUsage, err := (<-diskUsageChannel)()
 		if err == nil {
 			output["disk"] = diskUsage
+		}
+	}
+
+	if w.Host {
+		hostInformationChannel := make(chan func() (stats.HostInformation, error))
+		go test_runner.GetHostInformation(hostInformationChannel)
+		hostInformation, err := (<-hostInformationChannel)()
+		if err == nil {
+			output["host"] = hostInformation
 		}
 	}
 
