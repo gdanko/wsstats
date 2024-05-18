@@ -141,6 +141,8 @@ func (w *Wezterm) ProcessOutput(WeztermStatsData map[string]interface{}) {
 		w.ExitError(err)
 	}
 
+	// fmt.Println(string(jsonBytes))
+
 	err = os.WriteFile(w.OutputFile, jsonBytes, 0644)
 	if err != nil {
 		w.ExitError(err)
@@ -201,7 +203,7 @@ func (w *Wezterm) ParallelTester() (output map[string]interface{}) {
 		networkThroughput, iostatDataNew, err := (<-networkThroughputChannel)(w.Logger, w.IostatDataOld)
 		if err == nil {
 			w.IostatDataOld = iostatDataNew
-			output["newtwork"] = networkThroughput
+			output["network"] = networkThroughput
 		}
 	}
 
