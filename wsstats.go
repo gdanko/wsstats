@@ -3,13 +3,9 @@ package main
 // https://ieftimov.com/posts/four-steps-daemonize-your-golang-programs/
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	test_runner "github.com/gdanko/wsstats/gather"
 	"github.com/gdanko/wsstats/internal"
@@ -20,7 +16,6 @@ import (
 	"github.com/shirou/gopsutil/v3/load"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/sirupsen/logrus"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
 type Wezterm struct {
@@ -33,12 +28,10 @@ type Wezterm struct {
 	Memory         bool
 	Net            bool
 	Swap           bool
-	Lockfile       string
+	OutputData     map[string]interface{}
 	OutputFile     string
 	StartTime      uint64
 	Logger         *logrus.Logger
-	Logfile        string
-	LogfileHandle  *os.File
 	RunTimeCurrent uint64
 	IostatDataOld  test_runner.IOStatData
 }
@@ -57,7 +50,6 @@ type Options struct {
 
 func (w *Wezterm) init(args []string) error {
 	var (
-		err    error
 		opts   Options
 		parser *flags.Parser
 	)
@@ -82,8 +74,6 @@ func (w *Wezterm) init(args []string) error {
 	w.Memory = opts.Memory
 	w.Net = opts.Net
 	w.Swap = opts.Swap
-	w.Lockfile = "/tmp/wsstats.lock"
-	w.Logfile = "/tmp/wsstats.log"
 	w.Logger = logrus.New()
 	w.OutputFile = "/tmp/wsstats.json"
 	w.PrintVersion = opts.PrintVersion
@@ -92,59 +82,26 @@ func (w *Wezterm) init(args []string) error {
 	if len(args) == 1 || w.All {
 		w.CPU, w.Disk, w.Host, w.Load, w.Memory, w.Net, w.Swap = true, true, true, true, true, true, true
 	}
-
-	w.LogfileHandle, err = os.OpenFile(w.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to create the log file handle: %s", err.Error())
-	}
-
-	w.Logger.SetFormatter(&prefixed.TextFormatter{
-		DisableColors:   true,
-		ForceFormatting: true,
-		FullTimestamp:   true,
-		TimestampFormat: "2006-01-02 15:04:05",
-	})
-	w.Logger.SetOutput(w.LogfileHandle)
-	w.Logger.SetReportCaller(true)
-	w.Logger.Info("Starting")
-
 	return nil
 }
 
 func (w *Wezterm) ExitError(errorMessage error) {
-	w.CleanUp()
-	w.Logger.Error(errorMessage.Error())
-	w.LogfileHandle.Close()
 	os.Exit(1)
 }
 
 func (w *Wezterm) ExitCleanly() {
-	w.CleanUp()
-	w.LogfileHandle.Close()
 	os.Exit(0)
-}
-
-func (w *Wezterm) CreateLockfile() (err error) {
-	f, err := os.Create(w.Lockfile)
-	if err != nil {
-		return fmt.Errorf("failed to create the lockfile \"%s\"", w.Lockfile)
-	}
-	defer f.Close()
-
-	return nil
 }
 
 func (w *Wezterm) ShowVersion() {
 	fmt.Fprintf(os.Stdout, "wsstats version %s\n", internal.Version(false, true))
 }
 
-func (w *Wezterm) ProcessOutput(WeztermStatsData map[string]interface{}) {
-	jsonBytes, err := json.MarshalIndent(WeztermStatsData, "", "    ")
+func (w *Wezterm) ProcessOutput() {
+	jsonBytes, err := json.MarshalIndent(w.OutputData, "", "    ")
 	if err != nil {
 		w.ExitError(err)
 	}
-
-	// fmt.Println(string(jsonBytes))
 
 	err = os.WriteFile(w.OutputFile, jsonBytes, 0644)
 	if err != nil {
@@ -152,24 +109,15 @@ func (w *Wezterm) ProcessOutput(WeztermStatsData map[string]interface{}) {
 	}
 }
 
-func (w *Wezterm) CleanUp() {
-	for _, filename := range []string{w.OutputFile, w.Lockfile} {
-		err := util.DeleteFile(filename)
-		if err != nil {
-			w.Logger.Warn(err.Error())
-		}
-	}
-}
-
-func (w *Wezterm) ParallelTester() (output map[string]interface{}) {
+func (w *Wezterm) ParallelTester() {
 	// Fetch all data at once using Go channels
-	output = make(map[string]interface{})
+	w.OutputData = make(map[string]interface{})
 	if w.CPU {
 		cpuPercentChannel := make(chan func() ([]stats.PercentStat, error))
 		go test_runner.GetCpuPercent(cpuPercentChannel)
 		cpuPercent, err := (<-cpuPercentChannel)()
 		if err == nil {
-			output["cpu"] = cpuPercent
+			w.OutputData["cpu"] = cpuPercent
 		}
 	}
 
@@ -178,7 +126,7 @@ func (w *Wezterm) ParallelTester() (output map[string]interface{}) {
 		go test_runner.GetDiskUsage(diskUsageChannel)
 		diskUsage, err := (<-diskUsageChannel)()
 		if err == nil {
-			output["disk"] = diskUsage
+			w.OutputData["disk"] = diskUsage
 		}
 	}
 
@@ -187,7 +135,7 @@ func (w *Wezterm) ParallelTester() (output map[string]interface{}) {
 		go test_runner.GetHostInformation(hostInformationChannel)
 		hostInformation, err := (<-hostInformationChannel)()
 		if err == nil {
-			output["host"] = hostInformation
+			w.OutputData["host"] = hostInformation
 		}
 	}
 
@@ -196,7 +144,7 @@ func (w *Wezterm) ParallelTester() (output map[string]interface{}) {
 		go test_runner.GetLoadAverages(loadAveragesChannel)
 		loadAverages, err := (<-loadAveragesChannel)()
 		if err == nil {
-			output["load"] = loadAverages
+			w.OutputData["load"] = loadAverages
 		}
 	}
 
@@ -205,18 +153,18 @@ func (w *Wezterm) ParallelTester() (output map[string]interface{}) {
 		go test_runner.GetMemoryUsage(memoryUsageChannel)
 		memoryUsage, err := (<-memoryUsageChannel)()
 		if err == nil {
-			output["memory"] = memoryUsage
+			w.OutputData["memory"] = memoryUsage
 		}
 	}
 
 	if w.Net {
-		networkThroughputChannel := make(chan func(logger *logrus.Logger, iostatDataOld test_runner.IOStatData) ([]test_runner.NetworkInterfaceData, test_runner.IOStatData, error))
+		networkThroughputChannel := make(chan func() ([]*iostat.IOCountersStat, error))
 		go test_runner.GetNetworkThroughput(networkThroughputChannel)
-		networkThroughput, iostatDataNew, err := (<-networkThroughputChannel)(w.Logger, w.IostatDataOld)
+		networkThroughput, err := (<-networkThroughputChannel)()
 		if err == nil {
-			w.IostatDataOld = iostatDataNew
-			output["network"] = networkThroughput
+			w.OutputData["network"] = networkThroughput
 		}
+
 	}
 
 	if w.Swap {
@@ -224,97 +172,17 @@ func (w *Wezterm) ParallelTester() (output map[string]interface{}) {
 		go test_runner.GetSwapUsage(swapUsageChannel)
 		swapUsage, err := (<-swapUsageChannel)()
 		if err == nil {
-			output["swap"] = swapUsage
-		}
-	}
-	return output
-}
-
-func Run(ctx context.Context, w *Wezterm) error {
-	if w.PrintVersion {
-		w.ShowVersion()
-		w.ExitCleanly()
-	}
-
-	if util.FileExists(w.Lockfile) {
-		return fmt.Errorf("the lockfile \"%s\" already exists - the program is probably already running", w.Lockfile)
-	}
-
-	err := w.CreateLockfile()
-	if err != nil {
-		return err
-	}
-
-	// Get the first network sample
-	if w.Net {
-		data, err := iostat.GetData()
-		if err != nil {
-			return err
-		}
-		w.IostatDataOld.Interfaces = data
-		time.Sleep(1 * time.Second)
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-			w.RunTimeCurrent = util.GetTimestamp()
-
-			output := w.ParallelTester()
-			output["timestamp"] = w.RunTimeCurrent
-			output["start_time"] = w.StartTime
-			output["run_time"] = w.RunTimeCurrent - w.StartTime
-
-			w.ProcessOutput(output)
-
-			if w.RunTimeCurrent == util.GetTimestamp() {
-				time.Sleep(1 * time.Second)
-			}
+			w.OutputData["swap"] = swapUsage
 		}
 	}
 }
 
 func main() {
-	var err error
 	w := &Wezterm{}
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		select {
-		case s := <-signalChan:
-			switch s {
-			case syscall.SIGINT:
-				w.Logger.Info("Got SIGINT, exiting.")
-				w.ExitCleanly()
-			case syscall.SIGTERM:
-				w.Logger.Info("Got SIGTERM, exiting.")
-				w.ExitCleanly()
-			case syscall.SIGHUP:
-				w.Logger.Info("Got SIGHUP, reloading.")
-				w.init(os.Args)
-			}
-		case <-ctx.Done():
-			w.Logger.Info("Exiting normally.")
-			w.ExitCleanly()
-		}
-	}()
-
-	defer func() {
-		cancel()
-	}()
-
-	err = w.init(os.Args)
+	err := w.init(os.Args)
 	if err != nil {
 		w.ExitError(err)
 	}
-
-	if err := Run(ctx, w); err != nil {
-		w.ExitError(err)
-	}
+	w.ParallelTester()
+	w.ProcessOutput()
 }
