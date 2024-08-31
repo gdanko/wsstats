@@ -29,7 +29,6 @@ type Wezterm struct {
 	Net            bool
 	Swap           bool
 	OutputData     map[string]interface{}
-	OutputFile     string
 	StartTime      uint64
 	Logger         *logrus.Logger
 	RunTimeCurrent uint64
@@ -75,7 +74,6 @@ func (w *Wezterm) init(args []string) error {
 	w.Net = opts.Net
 	w.Swap = opts.Swap
 	w.Logger = logrus.New()
-	w.OutputFile = "/tmp/wsstats.json"
 	w.PrintVersion = opts.PrintVersion
 	w.StartTime = util.GetTimestamp()
 
@@ -98,15 +96,13 @@ func (w *Wezterm) ShowVersion() {
 }
 
 func (w *Wezterm) ProcessOutput() {
+	// var jsonOut bytes.Buffer
 	jsonBytes, err := json.MarshalIndent(w.OutputData, "", "    ")
 	if err != nil {
 		w.ExitError(err)
 	}
 
-	err = os.WriteFile(w.OutputFile, jsonBytes, 0644)
-	if err != nil {
-		w.ExitError(err)
-	}
+	fmt.Println(string(jsonBytes))
 }
 
 func (w *Wezterm) ParallelTester() {
@@ -184,5 +180,6 @@ func main() {
 		w.ExitError(err)
 	}
 	w.ParallelTester()
+	w.OutputData["timestamp"] = util.GetTimestamp()
 	w.ProcessOutput()
 }
