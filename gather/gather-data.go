@@ -1,25 +1,16 @@
 package test_runner
 
 import (
-	"fmt"
+	"time"
 
 	"github.com/gdanko/wsstats/iostat"
 	"github.com/gdanko/wsstats/stats"
 	"github.com/shirou/gopsutil/v3/load"
 	"github.com/shirou/gopsutil/v3/mem"
-	"github.com/sirupsen/logrus"
 )
 
-type NetworkInterfaceData struct {
-	Interface   string  `json:"interface"`
-	BytesRecv   float64 `json:"bytes_recv"`
-	BytesSent   float64 `json:"bytes_sent"`
-	PacketsRecv uint64  `json:"packets_recv"`
-	PacketsSent uint64  `json:"packets_sent"`
-}
-
 type IOStatData struct {
-	Interfaces []iostat.IOStatData `json:"interfaces"`
+	Interfaces []*iostat.IOCountersStat `json:"interfaces"`
 }
 
 func GetCpuPercent(c chan func() ([]stats.PercentStat, error)) {
@@ -64,50 +55,34 @@ func GetSwapUsage(c chan func() (*mem.SwapMemoryStat, error)) {
 	})
 }
 
-func GetNetworkThroughput(c chan func(logger *logrus.Logger, iostatDataOld IOStatData) (interfaces []NetworkInterfaceData, iostatDataNew IOStatData, err error)) {
-	c <- func(logger *logrus.Logger, iostatDataOld IOStatData) (interfaces []NetworkInterfaceData, iostatDataNew IOStatData, err error) {
-		data, err := iostat.GetData()
+func GetNetworkThroughput(c chan func() ([]*iostat.IOCountersStat, error)) {
+	c <- (func() ([]*iostat.IOCountersStat, error) {
+		firstSample, err := iostat.GetData()
 		if err != nil {
-			return interfaces, iostatDataNew, err
+			return []*iostat.IOCountersStat{}, err
 		}
-		iostatDataNew.Interfaces = data
-
-		for _, iostatBlock := range iostatDataNew.Interfaces {
-			var foundInOld, foundInNew = true, true
-
-			interfaceName := iostatBlock.Interface
-			interfaceOld, err := findInterface(interfaceName, iostatDataOld.Interfaces)
-			if err != nil {
-				logger.Warnf("interface \"%s\" not found in the old data set", interfaceName)
-				foundInOld = false
-			}
-			foundInOld = true
-
-			interfaceNew, err := findInterface(interfaceName, iostatDataNew.Interfaces)
-			if err != nil {
-				logger.Warnf("interface \"%s\" not found in the new data set", interfaceName)
-				foundInNew = false
-			}
-
-			if foundInOld && foundInNew {
-				interfaces = append(interfaces, NetworkInterfaceData{
-					Interface:   interfaceNew.Interface,
-					BytesSent:   interfaceNew.BytesSent - interfaceOld.BytesSent,
-					BytesRecv:   interfaceNew.BytesRecv - interfaceOld.BytesRecv,
-					PacketsSent: interfaceNew.PacketsSent - interfaceOld.PacketsSent,
-					PacketsRecv: interfaceNew.PacketsRecv - interfaceOld.PacketsRecv,
-				})
-			}
+		time.Sleep(1 * time.Second)
+		secondSample, err := iostat.GetData()
+		if err != nil {
+			return []*iostat.IOCountersStat{}, err
 		}
-		return interfaces, iostatDataNew, nil
-	}
-}
 
-func findInterface(interfaceName string, interfaceList []iostat.IOStatData) (iostatEntry iostat.IOStatData, err error) {
-	for _, iostatEntry = range interfaceList {
-		if interfaceName == iostatEntry.Interface {
-			return iostatEntry, nil
+		output := []*iostat.IOCountersStat{}
+		for i, _ := range firstSample {
+			output = append(output, &iostat.IOCountersStat{
+				Name:        firstSample[i].Name,
+				BytesSent:   secondSample[i].BytesSent - firstSample[i].BytesSent,
+				BytesRecv:   secondSample[i].BytesRecv - firstSample[i].BytesRecv,
+				PacketsSent: secondSample[i].PacketsSent - firstSample[i].PacketsSent,
+				PacketsRecv: secondSample[i].PacketsRecv - firstSample[i].PacketsRecv,
+				ErrorsIn:    secondSample[i].ErrorsIn - firstSample[i].ErrorsIn,
+				ErrorsOut:   secondSample[i].ErrorsOut - firstSample[i].ErrorsOut,
+				DroppedIn:   secondSample[i].DroppedIn - firstSample[i].DroppedIn,
+				DroppedOut:  secondSample[i].DroppedOut - firstSample[i].DroppedOut,
+				FifoIn:      secondSample[i].FifoIn - firstSample[i].FifoIn,
+				FifoOut:     secondSample[i].FifoOut - firstSample[i].FifoOut,
+			})
 		}
-	}
-	return iostat.IOStatData{}, fmt.Errorf("the interface \"%s\" was not found in this block", interfaceName)
+		return output, err
+	})
 }
